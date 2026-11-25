@@ -16,6 +16,9 @@ except Exception:
 
 GROQ_MODEL = "openai/gpt-oss-20b"
 
+print("GROQ KEY LOADED:", bool(GROQ_API_KEY))
+print("GROQ KEY LENGTH:", len(GROQ_API_KEY) if GROQ_API_KEY else 0)
+
 # Session settings
 SESSION_TIMEOUT_MINUTES = 60
 
