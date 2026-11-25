@@ -1,4 +1,5 @@
 import os
+import streamlit as st
 from dotenv import load_dotenv
 
 # Load environment variables from the project's .env file
@@ -8,7 +9,11 @@ load_dotenv()
 APP_NAME = "AletheAI"
 
 # Groq configuration
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+try:
+    GROQ_API_KEY = st.secrets.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
+except Exception:
+    GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
 GROQ_MODEL = "openai/gpt-oss-20b"
 
 # Session settings

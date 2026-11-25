@@ -1,13 +1,12 @@
 import hashlib
 import streamlit as st
-
 from workspaces.data_analysis.analysis import (
     load_dataset,
     get_dataset_overview,
     get_statistical_summary,
     create_visualization,
 )
-
+import pandas as pd
 
 def render_data_analysis_workspace():
 
@@ -131,7 +130,8 @@ def render_data_analysis_workspace():
 
             except Exception as e:
                 st.error(f"Unable to generate chart: {e}")
-
+                
+                
     with preview_tab:
         st.markdown("### Dataset Preview")
 

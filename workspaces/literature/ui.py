@@ -112,6 +112,14 @@ def render_literature_workspace():
                 st.error(f"Could not process this file: {error}")
                 return
 
+    else:
+    # Clear the previous document when the upload is removed.
+     st.session_state.pop("literature_document", None)
+     st.session_state.pop("literature_document_key", None)
+     st.session_state.pop("literature_vector_client", None)
+     st.session_state.pop("literature_vector_collection", None)
+     st.session_state.pop("literature_response", None)        
+
     document = st.session_state.get("literature_document")
 
     if not document:
@@ -144,44 +152,50 @@ def render_literature_workspace():
 
     if st.button("Explore", key="literature_explore"):
 
-        if not question.strip():
-            st.warning("Enter a question or request first.")
+      if not question.strip():
+        st.warning("Enter a question or request first.")
 
-        else:
-            collection = st.session_state.literature_vector_collection
+      else:
+        collection = st.session_state.literature_vector_collection
 
-            with st.spinner("Exploring your literary work..."):
+        with st.spinner("Exploring your literary work..."):
 
-                results = search_chunks(
-                    collection,
-                    question,
-                    top_k=8,
+            results = search_chunks(
+                collection,
+                question,
+                top_k=8,
+            )
+
+            if not results:
+                st.session_state.pop("literature_response", None)
+                st.warning(
+                    "I couldn't find relevant passages. "
+                    "Try rephrasing your request."
                 )
 
-                if not results:
-                    st.warning(
-                        "I couldn't find relevant passages. "
-                        "Try rephrasing your request."
-                    )
+            else:
+                context = "\n\n".join(
+                    f"Page {item['metadata'].get('page', 'Unknown')}:\n"
+                    f"{item['content']}"
+                    for item in results
+                )
 
+                if mode == "Novels & Literary Works":
+                    response = analyze_novel(
+                        feature,
+                        question,
+                        context,
+                    )
                 else:
-                    context = "\n\n".join(
-                        f"Page {item['metadata'].get('page', 'Unknown')}:\n"
-                        f"{item['content']}"
-                        for item in results
+                    response = analyze_poetry(
+                        feature,
+                        question,
+                        context,
                     )
 
-                    if mode == "Novels & Literary Works":
-                        response = analyze_novel(
-                            feature,
-                            question,
-                            context,
-                        )
-                    else:
-                        response = analyze_poetry(
-                            feature,
-                            question,
-                            context,
-                        )
+                st.session_state.literature_response = response
 
-                    st.markdown(response)
+
+# Display the response outside the button block
+    if st.session_state.get("literature_response"):
+      st.markdown(st.session_state.literature_response)

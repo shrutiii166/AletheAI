@@ -3,6 +3,8 @@ from core.config import APP_NAME, TOP_K_RESULTS
 from core.llm_connector import generate_response
 from rag.document_loader import load_pdf_pages
 from rag.chunker import split_documents
+from workspaces.about import render_about_page
+from workspaces.data_analysis.nl_analysis import answer_data_question
 from workspaces.data_analysis.ui import render_data_analysis_workspace
 from workspaces.literature.ui import render_literature_workspace
 from core.study_tools import (
@@ -66,12 +68,7 @@ WORKSPACES = {
         "icon": "📊",
         "description": "Explore datasets, discover patterns, and visualize data.",
         "placeholder": "Ask a question about your data...",
-    },
-    "General AI Chatbot": {
-        "icon": "✦",
-        "description": "Brainstorm, write, explore ideas, and ask anything.",
-        "placeholder": "What would you like to explore?",
-    },
+    }
 }
 
 # --------------------------------------------------
@@ -84,7 +81,10 @@ if "workspace_histories" not in st.session_state:
     }
 
 if "active_workspace" not in st.session_state:
-    st.session_state.active_workspace = "General AI Chatbot"
+    st.session_state.active_workspace = "Literature & Book Companion"
+
+if st.session_state.active_workspace not in WORKSPACES:
+    st.session_state.active_workspace = "Literature & Book Companion"
 
 if "document_key" not in st.session_state:
     st.session_state.document_key = None
@@ -109,6 +109,14 @@ if "study_summaries" not in st.session_state:
 
 if "general_chat_history" not in st.session_state:
     st.session_state.general_chat_history = []
+
+if "show_about" not in st.session_state:
+    st.session_state.show_about = False
+
+
+def close_about_on_workspace_change():
+    st.session_state.show_about = False    
+
 # --------------------------------------------------
 # Sidebar
 # --------------------------------------------------
@@ -118,6 +126,15 @@ with st.sidebar:
     st.caption("Your AI workspace")
     st.divider()
 
+    show_about = st.button(
+        "ℹ️ About AletheAI",
+        use_container_width=True,
+        key="about_navigation",
+    )
+
+    if show_about:
+        st.session_state.show_about = True
+
     selected_workspace = st.radio(
         "Choose your workspace",
         options=list(WORKSPACES.keys()),
@@ -125,6 +142,7 @@ with st.sidebar:
             f"{WORKSPACES[name]['icon']}  {name}"
         ),
         key="workspace_navigation",
+        on_change=close_about_on_workspace_change,
     )
 
     st.session_state.active_workspace = selected_workspace
@@ -140,10 +158,12 @@ with st.sidebar:
 
     st.caption("Your conversations are separated by workspace.")
 
-
 # --------------------------------------------------
 # Main workspace
-# --------------------------------------------------
+# -------------------------------------------------
+if st.session_state.show_about:
+    render_about_page()
+    st.stop()
 
 workspace = st.session_state.active_workspace
 workspace_info = WORKSPACES[workspace]
@@ -664,19 +684,6 @@ if workspace == "Study Assistant":
                     except Exception as error:
                         st.error(f"Couldn't estimate difficulty: {error}")               
 
-# --------------------------------------------------
-# General AI Chatbot information
-# --------------------------------------------------
-
-if workspace == "General AI Chatbot":
-    st.info(
-        "This is the general chat workspace. "
-        "Live web search and specialized tools will be connected "
-        "in later steps."
-    )
-
-
-st.divider()
 
 # --------------------------------------------------
 # Display conversation history
@@ -705,37 +712,59 @@ if user_prompt:
         st.markdown(user_prompt)
 
     with st.chat_message("assistant"):
-        with st.spinner("AletheAI is thinking..."):
+        with st.spinner("AletheAI is working on that...✦"):
             try:
-                # Document Intelligence and Study Assistant use RAG.
+                # Document Intelligence, Study Assistant and Literature
+                # use RAG when a document is uploaded.
                 if workspace in [
                     "Document Intelligence",
                     "Study Assistant",
                     "Literature & Book Companion",
                 ]:
 
-                    # Select the correct vector collection for each workspace.
+                    # Select the correct vector collection.
                     if workspace == "Study Assistant":
-                        collection = st.session_state.study_vector_collection
+                        collection = (
+                            st.session_state.study_vector_collection
+                        )
 
                     elif workspace == "Literature & Book Companion":
                         collection = st.session_state.get(
-                                    "literature_vector_collection"
-                        )    
+                            "literature_vector_collection"
+                        )
+
                     else:
                         collection = st.session_state.vector_collection
 
+                    # Handle questions when no document is uploaded.
                     if collection is None:
 
                         if workspace == "Literature & Book Companion":
-                              answer = generate_literature_chat_response(messages)
+                            answer = generate_literature_chat_response(
+                                messages
+                            )
 
                         else:
-                         answer = (
-                            "Please upload a PDF and wait for indexing "
-                            "to finish before asking questions."
-                         )
+                            general_conversation = [
+                                {
+                                    "role": "system",
+                                    "content": (
+                                        "You are AletheAI, a helpful AI assistant. "
+                                        "Answer general questions clearly and accurately. "
+                                        "Be honest about uncertainty. Do not invent "
+                                        "document references or claim to have accessed "
+                                        "an uploaded document when none is available."
+                                    ),
+                                }
+                            ]
 
+                            general_conversation.extend(messages)
+
+                            answer = generate_response(
+                                messages=general_conversation
+                            )
+
+                    # Handle questions when a document is uploaded.
                     else:
                         retrieved_chunks = search_chunks(
                             collection,
@@ -755,12 +784,8 @@ if user_prompt:
                             for chunk in retrieved_chunks:
                                 metadata = chunk["metadata"]
 
-                                source = metadata.get(
-                                    "source", "Unknown"
-                                )
-                                page = metadata.get(
-                                    "page", "Unknown"
-                                )
+                                source = metadata.get("source", "Unknown")
+                                page = metadata.get("page", "Unknown")
 
                                 context_parts.append(
                                     f"Source: {source}\n"
@@ -768,9 +793,7 @@ if user_prompt:
                                     f"Content:\n{chunk['content']}"
                                 )
 
-                            context = "\n\n---\n\n".join(
-                                context_parts
-                            )
+                            context = "\n\n---\n\n".join(context_parts)
 
                             # Use a workspace-specific system prompt.
                             if workspace == "Study Assistant":
@@ -829,11 +852,8 @@ if user_prompt:
                                 "content": system_content,
                             }
 
-                            # Include earlier conversation turns so follow-up
-                            # questions can use the conversation history.
-                            conversation = [
-                                document_system_message
-                            ]
+                            # Include earlier conversation turns.
+                            conversation = [document_system_message]
 
                             conversation.extend(
                                 {
@@ -847,7 +867,32 @@ if user_prompt:
                                 messages=conversation
                             )
 
-                # Other workspaces use the general assistant prompt.
+                # Data Analysis uses the natural-language analysis engine.
+                elif workspace == "Data Analysis":
+                    df = st.session_state.get("data_analysis_df")
+
+                    if df is None:
+                        answer = (
+                            "Please upload a CSV or Excel dataset "
+                            "before asking questions."
+                        )
+
+                    else:
+                        analysis_response = answer_data_question(
+                            user_prompt, df
+                        )
+
+                        answer = analysis_response["answer"]
+                        result = analysis_response["result"]
+
+                        answer += (
+                            "\n\n**Calculated result:**\n"
+                            "```text\n"
+                            f"{result}\n"
+                            "```"
+                        )
+
+                # General assistant fallback.
                 else:
                     conversation = [
                         {
@@ -891,8 +936,9 @@ if user_prompt:
 
             except Exception as error:
                 st.error(
-                    "Something went wrong while generating the answer. "
-                    f"Error details: {error}"
+                    "AletheAI couldn't complete your request. "
+                    "Please try again in a moment."
                 )
+                print("ALETHEAI DEBUG ERROR:", repr(error))
 
     st.rerun()
