@@ -140,29 +140,41 @@ def render_literature_workspace():
 
     feature = st.selectbox(
         "Choose an experience",
-        features,
-        key="literature_feature",
+         features,
+         key="literature_feature",
     )
 
-    question = st.text_area(
-        "What would you like to explore?",
-        placeholder="Ask a question or describe what you'd like analysed...",
+    additional_instruction = st.text_area(
+        "Any specific instructions? (Optional)",
+        placeholder="e.g. Analyse a character specifically, focus on Chapter you liked, or explain the symbolism...",
         key="literature_analysis_question",
     )
 
     if st.button("Explore", key="literature_explore"):
-
-      if not question.strip():
-        st.warning("Enter a question or request first.")
-
-      else:
         collection = st.session_state.literature_vector_collection
+
+        analysis_request = (
+            f"Perform {feature} on the uploaded literary work. "
+            "Provide a detailed analysis based on the text."
+        )
+
+        if additional_instruction.strip():
+            analysis_request += (
+                f"\n\nAdditional user instructions: "
+                f"{additional_instruction.strip()}"
+            )
 
         with st.spinner("Exploring your literary work..."):
 
+            search_query = (
+                additional_instruction.strip()
+                if additional_instruction.strip()
+                else feature
+            )
+
             results = search_chunks(
                 collection,
-                question,
+                search_query,
                 top_k=8,
             )
 
@@ -170,7 +182,7 @@ def render_literature_workspace():
                 st.session_state.pop("literature_response", None)
                 st.warning(
                     "I couldn't find relevant passages. "
-                    "Try rephrasing your request."
+                    "Try refining your instructions."
                 )
 
             else:
@@ -183,19 +195,18 @@ def render_literature_workspace():
                 if mode == "Novels & Literary Works":
                     response = analyze_novel(
                         feature,
-                        question,
+                        analysis_request,
                         context,
                     )
                 else:
                     response = analyze_poetry(
                         feature,
-                        question,
+                        analysis_request,
                         context,
                     )
 
                 st.session_state.literature_response = response
 
-
-# Display the response outside the button block
+    # Display the response outside the button block
     if st.session_state.get("literature_response"):
-      st.markdown(st.session_state.literature_response)
+        st.markdown(st.session_state.literature_response)

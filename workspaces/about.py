@@ -53,7 +53,7 @@ def render_about_page():
 
         A place to ramble about a poem that stuck with you at 2 a.m.
         To argue about what a character really meant. To dig one stubborn
-        answer out of a 200-page document. Or to ask a spreadsheet what
+        answer out of a 200-page document, or to ask a spreadsheet what
         it's been hiding all this time.
 
         I didn't appear fully formed, though. I got built through a lot
